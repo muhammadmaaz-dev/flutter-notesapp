@@ -1,16 +1,46 @@
-# newapp
+# 📝 Flutter Notes App
 
-A new Flutter project.
+A simple and modern **Notes Taking App** built with Flutter.  
+This app allows users to **create, read, update, and delete (CRUD)** notes with custom colors.  
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## ✨ Features
 
-A few resources to get you started if this is your first Flutter project:
+- ✅ Add new notes with title & description  
+- ✅ Edit and delete notes  
+- ✅ Beautiful UI with custom colors for each note  
+- ✅ Local database using **SQLite (sqflite)**  
+- ✅ Responsive design (works on all screen sizes)  
+- ✅ Splash Screen with animation (Lottie + Animated Splash)  
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+
+
+## 🛠️ Tech Stack
+
+- **Flutter** (Dart)
+- **SQLite** with `sqflite` package
+- **Lottie** animations
+- **flutter_staggered_grid_view** for grid layout
+- **flutter_colorpicker** for note colors
+
+---
+
+## 🚀 Getting Started
+
+Follow these steps to run the project locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/muhammadmaaz-dev/flutter-notesapp.git
+
+# Navigate to project folder
+cd flutter-notesapp
+
+# Get the dependencies
+flutter pub get
+
+# Run the app
+flutter run
