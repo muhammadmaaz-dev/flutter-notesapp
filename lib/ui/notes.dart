@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:newapp/local/db_helper.dart';
 import 'package:newapp/services/notification_service.dart';
 import 'package:newapp/ui/add.dart';
+import 'package:newapp/ui/legal_view.dart';
 import 'package:newapp/ui/readNotes.dart';
 
 class NotesUi extends StatefulWidget {
@@ -53,6 +54,8 @@ class _NotesUiState extends State<NotesUi> {
     }
   }
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> filteredNotes = selectedButton == 'All'
@@ -65,6 +68,8 @@ class _NotesUiState extends State<NotesUi> {
         notes.where((n) => n[DbHelper.COL_NOTE_IMPORTANT] == 1).length;
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: _buildSideDrawer(context, importantCount),
       backgroundColor: Colors.black,
       body: SafeArea(
         bottom: false,
@@ -85,25 +90,49 @@ class _NotesUiState extends State<NotesUi> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text(
-                          "My Notes",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 40.sp,
-                            fontFamily: 'NunitoBold',
+                        GestureDetector(
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          child: Container(
+                            width: 44.r,
+                            height: 44.r,
+                            margin: EdgeInsets.only(right: 12.w),
+                            decoration: BoxDecoration(
+                              color: const Color(0xff16161A),
+                              borderRadius: BorderRadius.circular(14.r),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.menu_rounded,
+                              color: Colors.white,
+                              size: 22.sp,
+                            ),
                           ),
                         ),
-                        SizedBox(height: 2.h),
-                        Text(
-                          "${notes.length} notes recorded",
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 14.sp,
-                            fontFamily: 'Nunito',
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "My Notes",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 34.sp,
+                                fontFamily: 'NunitoBold',
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              "${notes.length} notes recorded",
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 13.sp,
+                                fontFamily: 'Nunito',
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -333,6 +362,211 @@ class _NotesUiState extends State<NotesUi> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSideDrawer(BuildContext context, int importantCount) {
+    return Drawer(
+      backgroundColor: const Color(0xFF0F0F12),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48.r,
+                    height: 48.r,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B1B20),
+                      borderRadius: BorderRadius.circular(14.r),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(13.r),
+                      child: Image.asset(
+                        'assets/1b1ebb0d0b3b5d8b-capybara-7.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.sticky_note_2_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 14.w),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Noto",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20.sp,
+                          fontFamily: 'NunitoBold',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "Private & Offline",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12.sp,
+                          fontFamily: 'Nunito',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            SizedBox(height: 10.h),
+
+            // Section 1: Notes Filters
+            _drawerTile(
+              icon: Icons.notes_rounded,
+              title: "All Notes",
+              badgeCount: notes.length,
+              isSelected: selectedButton == 'All',
+              onTap: () {
+                setState(() => selectedButton = 'All');
+                Navigator.pop(context);
+              },
+            ),
+            _drawerTile(
+              icon: Icons.label_important_rounded,
+              title: "Important Notes",
+              badgeCount: importantCount,
+              isSelected: selectedButton == 'Important',
+              onTap: () {
+                setState(() => selectedButton = 'Important');
+                Navigator.pop(context);
+              },
+            ),
+
+            SizedBox(height: 16.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Text(
+                "ABOUT & LEGAL",
+                style: TextStyle(
+                  color: Colors.white30,
+                  fontSize: 11.sp,
+                  fontFamily: 'NunitoBold',
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            SizedBox(height: 6.h),
+
+            _drawerTile(
+              icon: Icons.shield_outlined,
+              title: "Privacy Policy",
+              onTap: () {
+                Navigator.pop(context);
+                LegalView.showPrivacyPolicy(context);
+              },
+            ),
+            _drawerTile(
+              icon: Icons.article_outlined,
+              title: "Terms of Service",
+              onTap: () {
+                Navigator.pop(context);
+                LegalView.showTermsOfService(context);
+              },
+            ),
+            _drawerTile(
+              icon: Icons.info_outline_rounded,
+              title: "About Noto",
+              onTap: () {
+                Navigator.pop(context);
+                LegalView.showAbout(context);
+              },
+            ),
+
+            const Spacer(),
+            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Noto v1.0.0",
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12.sp,
+                      fontFamily: 'Nunito',
+                    ),
+                  ),
+                  Text(
+                    "Xevon Labs",
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12.sp,
+                      fontFamily: 'NunitoBold',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerTile({
+    required IconData icon,
+    required String title,
+    int? badgeCount,
+    bool isSelected = false,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          icon,
+          color: isSelected ? Colors.white : Colors.white70,
+          size: 20.sp,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 14.sp,
+            fontFamily: 'NunitoBold',
+          ),
+        ),
+        trailing: badgeCount != null
+            ? Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Text(
+                  badgeCount.toString(),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11.sp,
+                    fontFamily: 'NunitoBold',
+                  ),
+                ),
+              )
+            : null,
+        onTap: onTap,
       ),
     );
   }

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Noto</title>
+    <style>
+        :root {
+            --bg-color: #0d0d11;
+            --card-bg: #16161b;
+            --text-primary: #f0f0f5;
+            --text-secondary: #9999aa;
+            --accent: #fca590;
+            --border-color: rgba(255, 255, 255, 0.08);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.65;
+            padding: 40px 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        h1, h2, h3 {
+            color: #ffffff;
+            font-weight: 700;
+        }
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+        .meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 1.4rem;
+            margin-top: 30px;
+            color: var(--accent);
+        }
+        p, li {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+        strong {
+            color: var(--text-primary);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            color: #ffffff;
+            background-color: rgba(255,255,255,0.03);
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(252, 165, 144, 0.15);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Privacy Policy for Noto</h1>
+        <div class="meta">
+            <strong>Last updated:</strong> August 24, 2026<br>
+            <strong>Developer:</strong> Xevon Labs (<code>com.xevonlabs.noto</code>)<br>
+            <strong>Contact:</strong> support@xevonlabs.com
+        </div>
+
+        <h2>1. Overview & Core Philosophy</h2>
+        <p>At <strong>Xevon Labs</strong>, we believe your personal notes, thoughts, and ideas should remain private and entirely under your control. <strong>Noto</strong> is built as an <strong>offline-first</strong> application. We do not sell, rent, monetize, or scan your personal content.</p>
+
+        <h2>2. Information We Process</h2>
+        <h3>A. Your Notes and Content (100% Offline)</h3>
+        <p>• <strong>Local Storage:</strong> All note titles, bodies, color themes, creation timestamps, and reminder schedules are stored exclusively on your local device using an isolated SQLite database.</p>
+        <p>• <strong>Zero Cloud Scanning:</strong> Your notes are never transmitted to our servers or any third-party cloud infrastructure.</p>
+
+        <h3>B. Anonymous Technical Telemetry</h3>
+        <p>To ensure app stability and monitor adoption, Noto transmits minimal, non-personally identifiable telemetry to our secure Supabase backend:</p>
+        <ul>
+            <li><strong>Installation Identifier:</strong> A randomly generated UUID (v4) created upon first launch (never linked to personal info).</li>
+            <li><strong>Coarse Locale / Country Code:</strong> Derived from OS locale (e.g. <code>US</code>, <code>PK</code>) with zero GPS access.</li>
+            <li><strong>Device Platform:</strong> Operating system name (e.g. <code>Android</code>, <code>iOS</code>).</li>
+            <li><strong>Heartbeat Timestamp:</strong> Timestamp when the app is actively in use.</li>
+        </ul>
+
+        <h2>3. Device Permissions</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Permission</th>
+                    <th>Technical Name</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Notifications</strong></td>
+                    <td><code>POST_NOTIFICATIONS</code></td>
+                    <td>Delivers local reminder alerts that you explicitly schedule for specific notes.</td>
+                </tr>
+                <tr>
+                    <td><strong>Exact Alarms</strong></td>
+                    <td><code>SCHEDULE_EXACT_ALARM</code></td>
+                    <td>Ensures reminder notifications fire at the exact chosen minute even in Doze mode.</td>
+                </tr>
+                <tr>
+                    <td><strong>Reboot Rescheduling</strong></td>
+                    <td><code>RECEIVE_BOOT_COMPLETED</code></td>
+                    <td>Automatically restores scheduled local alarms after your phone restarts.</td>
+                </tr>
+                <tr>
+                    <td><strong>Vibration</strong></td>
+                    <td><code>VIBRATE</code></td>
+                    <td>Provides tactile vibration feedback on button taps and alarm notifications.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Data Retention & Deletion</h2>
+        <p>You can delete individual notes at any time, or clear all app data / uninstall the app to instantly and permanently erase all local notes.</p>
+
+        <h2>5. Children's Privacy</h2>
+        <p>Noto does not knowingly collect or solicit personal information from children under the age of 13. The application contains no age-restricted content.</p>
+
+        <h2>6. Contact Us</h2>
+        <p>If you have questions regarding this Privacy Policy:<br>
+        • <strong>Email:</strong> support@xevonlabs.com<br>
+        • <strong>Developer Organization:</strong> Xevon Labs<br>
+        • <strong>Website:</strong> https://xevonlabs.com</p>
+    </div>
+</body>
+</html>
