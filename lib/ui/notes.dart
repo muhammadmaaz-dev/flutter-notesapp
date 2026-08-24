@@ -1,8 +1,11 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
 import 'package:newapp/local/db_helper.dart';
+import 'package:newapp/services/notification_service.dart';
 import 'package:newapp/ui/add.dart';
 import 'package:newapp/ui/readNotes.dart';
 
@@ -104,55 +107,41 @@ class _NotesUiState extends State<NotesUi> {
                         ),
                       ],
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xff1a1a1a),
+                    OpenContainer<bool>(
+                      transitionDuration: const Duration(milliseconds: 280),
+                      closedElevation: 0,
+                      openElevation: 0,
+                      closedColor: const Color(0xff1a1a1a),
+                      openColor: Colors.white,
+                      middleColor: const Color(0xff1a1a1a),
+                      closedShape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30.r),
                       ),
-                      child: IconButton(
-                        onPressed: () async {
-                          bool? isadded = await Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              transitionDuration:
-                                  const Duration(milliseconds: 500),
-                              pageBuilder:
-                                  (context, animation, secondaryAnimation) =>
-                                      const Add(),
-                              transitionsBuilder: (
-                                context,
-                                animation,
-                                secondaryAnimation,
-                                child,
-                              ) {
-                                const begin = Offset(0.0, 1.0);
-                                const end = Offset.zero;
-                                const curve = Curves.ease;
-
-                                var tween = Tween(
-                                  begin: begin,
-                                  end: end,
-                                ).chain(CurveTween(curve: curve));
-                                var offsetAnimation = animation.drive(tween);
-
-                                return SlideTransition(
-                                  position: offsetAnimation,
-                                  child: child,
-                                );
-                              },
-                            ),
-                          );
-
-                          if (isadded == true) {
-                            loadnotes();
-                          }
-                        },
-                        icon: Icon(
-                          Icons.add,
-                          color: Colors.white,
-                          size: 30.sp,
-                        ),
+                      openShape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
                       ),
+                      clipBehavior: Clip.antiAlias,
+                      tappable: false,
+                      onClosed: (_) {
+                        loadnotes();
+                      },
+                      closedBuilder: (context, openContainer) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xff1a1a1a),
+                            borderRadius: BorderRadius.circular(30.r),
+                          ),
+                          child: IconButton(
+                            onPressed: openContainer,
+                            icon: Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 30.sp,
+                            ),
+                          ),
+                        );
+                      },
+                      openBuilder: (context, closeContainer) => const Add(),
                     ),
                   ],
                 ),
@@ -211,116 +200,131 @@ class _NotesUiState extends State<NotesUi> {
                   itemBuilder: (context, index) {
                     var note = filteredNotes[index];
                     Color noteColor = Color(note[DbHelper.COL_NOTE_COLOR]);
+                    int? reminderAtMs = note[DbHelper.COL_NOTE_REMINDER_AT] as int?;
+                    int? createdAtMs = note[DbHelper.COL_NOTE_CREATED_AT] as int?;
+                    bool hasFutureReminder = reminderAtMs != null &&
+                        reminderAtMs > DateTime.now().millisecondsSinceEpoch;
 
                     return Padding(
                       padding: EdgeInsets.all(5.r),
-                      child: GestureDetector(
-                        onTap: () async {
-                          bool? isUpdated = await Navigator.of(context).push(
-                            PageRouteBuilder(
-                              transitionDuration: const Duration(
-                                milliseconds: 500,
-                              ),
-                              pageBuilder:
-                                  (context, animation, secondaryAnimation) =>
-                                      readnotes(
-                                        noteId: note[DbHelper.COL_NOTE_SNO],
-                                        title: note[DbHelper.COL_NOTE_TITLE],
-                                        desc: note[DbHelper.COL_NOTE_DESC],
-                                        color: Color(
-                                          note[DbHelper.COL_NOTE_COLOR],
-                                        ),
-                                      ),
-                              transitionsBuilder: (
-                                context,
-                                animation,
-                                secondaryAnimation,
-                                child,
-                              ) {
-                                const begin = Offset(1.0, 0.0);
-                                const end = Offset.zero;
-                                var curve = Curves.easeInOutCubic;
-
-                                var tween = Tween(
-                                  begin: begin,
-                                  end: end,
-                                ).chain(CurveTween(curve: curve));
-
-                                return SlideTransition(
-                                  position: animation.drive(tween),
-                                  child: child,
-                                );
-                              },
-                            ),
-                          );
-
-                          if (isUpdated == true) {
-                            loadnotes();
-                          }
-                        },
-                        onLongPress: () {
-                          bottomSheet(
-                            context,
-                            note[DbHelper.COL_NOTE_SNO],
-                            note[DbHelper.COL_NOTE_TITLE],
-                            note[DbHelper.COL_NOTE_DESC],
-                            note[DbHelper.COL_NOTE_COLOR],
-                            note[DbHelper.COL_NOTE_IMPORTANT] == 1,
-                            loadnotes,
-                            toast,
-                          );
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.all(
-                              Radius.circular(25.r),
-                            ),
-                            color: noteColor,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: 10.w,
-                                  right: 10.w,
-                                  top: 5.h,
-                                ),
-                                child: Text(
-                                  note[DbHelper.COL_NOTE_TITLE],
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 21.sp,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                    fontFamily: 'NunitoBold',
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 5.h),
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: 10.w,
-                                  right: 10.w,
-                                  bottom: 5.h,
-                                ),
-                                child: Text(
-                                  note[DbHelper.COL_NOTE_DESC],
-                                  maxLines: 6,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 17.sp,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                    fontFamily: 'Nunito',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      child: OpenContainer<bool>(
+                        transitionDuration: const Duration(milliseconds: 280),
+                        closedElevation: 0,
+                        openElevation: 0,
+                        closedColor: noteColor,
+                        openColor: noteColor,
+                        middleColor: noteColor,
+                        closedShape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25.r),
                         ),
+                        openShape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        tappable: false,
+                        onClosed: (_) {
+                          loadnotes();
+                        },
+                        openBuilder: (context, closeContainer) {
+                          return readnotes(
+                            noteId: note[DbHelper.COL_NOTE_SNO],
+                            title: note[DbHelper.COL_NOTE_TITLE],
+                            desc: note[DbHelper.COL_NOTE_DESC],
+                            color: noteColor,
+                            isImportant: note[DbHelper.COL_NOTE_IMPORTANT] == 1,
+                            reminderAt: reminderAtMs != null
+                                ? DateTime.fromMillisecondsSinceEpoch(reminderAtMs)
+                                : null,
+                            createdAt: createdAtMs != null
+                                ? DateTime.fromMillisecondsSinceEpoch(createdAtMs)
+                                : null,
+                          );
+                        },
+                        closedBuilder: (context, openContainer) {
+                          return GestureDetector(
+                            onTap: openContainer,
+                            onLongPress: () {
+                              bottomSheet(
+                                context,
+                                note[DbHelper.COL_NOTE_SNO],
+                                note[DbHelper.COL_NOTE_TITLE],
+                                note[DbHelper.COL_NOTE_DESC],
+                                note[DbHelper.COL_NOTE_COLOR],
+                                note[DbHelper.COL_NOTE_IMPORTANT] == 1,
+                                reminderAtMs,
+                                createdAtMs,
+                                loadnotes,
+                                toast,
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(25.r),
+                                ),
+                                color: noteColor,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 10.w,
+                                      right: 10.w,
+                                      top: 5.h,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            note[DbHelper.COL_NOTE_TITLE],
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 21.sp,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black,
+                                              fontFamily: 'NunitoBold',
+                                            ),
+                                          ),
+                                        ),
+                                        if (hasFutureReminder) ...[
+                                          SizedBox(width: 4.w),
+                                          Icon(
+                                            Icons.alarm_rounded,
+                                            size: 16.sp,
+                                            color: Colors.black87,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(height: 5.h),
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 10.w,
+                                      right: 10.w,
+                                      bottom: 5.h,
+                                    ),
+                                    child: Text(
+                                      note[DbHelper.COL_NOTE_DESC],
+                                      maxLines: 6,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 17.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                        fontFamily: 'Nunito',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
@@ -503,7 +507,93 @@ class _StickyFilterBarDelegate extends SliverPersistentHeaderDelegate {
 }
 
 // -----------------------------------------------------------------------------
-// Original Bottom Sheet & Confirmation Dialog
+// Date & Time Picker Helper for Reminders
+// -----------------------------------------------------------------------------
+Future<DateTime?> pickReminderDateTime(BuildContext context, {DateTime? initialDate}) async {
+  final now = DateTime.now();
+  final firstDate = now;
+  final lastDate = now.add(const Duration(days: 365 * 5));
+
+  final pickedDate = await showDatePicker(
+    context: context,
+    initialDate: initialDate != null && initialDate.isAfter(now) ? initialDate : now,
+    firstDate: firstDate,
+    lastDate: lastDate,
+    builder: (context, child) {
+      return Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: Colors.white,
+            onPrimary: Colors.black,
+            surface: Color(0xff1e1e1e),
+            onSurface: Colors.white,
+          ),
+          dialogTheme: const DialogThemeData(backgroundColor: Color(0xff1e1e1e)),
+        ),
+        child: child!,
+      );
+    },
+  );
+
+  if (pickedDate == null || !context.mounted) return null;
+
+  final pickedTime = await showTimePicker(
+    context: context,
+    initialTime: initialDate != null
+        ? TimeOfDay.fromDateTime(initialDate)
+        : TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5))),
+    builder: (context, child) {
+      return Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: Colors.white,
+            onPrimary: Colors.black,
+            surface: Color(0xff1e1e1e),
+            onSurface: Colors.white,
+          ),
+          dialogTheme: const DialogThemeData(backgroundColor: Color(0xff1e1e1e)),
+        ),
+        child: child!,
+      );
+    },
+  );
+
+  if (pickedTime == null) return null;
+
+  final fullDateTime = DateTime(
+    pickedDate.year,
+    pickedDate.month,
+    pickedDate.day,
+    pickedTime.hour,
+    pickedTime.minute,
+  );
+
+  if (fullDateTime.isBefore(DateTime.now())) {
+    if (context.mounted) {
+      Fluttertoast.showToast(
+        msg: "Please pick a future time for the reminder",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+    return null;
+  }
+
+  return fullDateTime;
+}
+
+String formatCreatedAt(int? createdAtMs) {
+  if (createdAtMs == null) return "Created recently";
+  final dt = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
+  final dateStr = DateFormat('MMM d, y').format(dt);
+  final timeStr = DateFormat('h:mm a').format(dt);
+  return "Created on $dateStr at $timeStr";
+}
+
+// -----------------------------------------------------------------------------
+// Original Bottom Sheet & Confirmation Dialog with Remind Me and Created At
 // -----------------------------------------------------------------------------
 void bottomSheet(
   BuildContext context,
@@ -512,6 +602,8 @@ void bottomSheet(
   String desc,
   int colorValue,
   bool isImportant,
+  int? reminderAtMs,
+  int? createdAtMs,
   Function loadnotes,
   Function toast,
 ) {
@@ -527,23 +619,27 @@ void bottomSheet(
           color: Colors.black,
           border: const Border(top: BorderSide(color: Colors.white)),
         ),
-        height: 200.h,
+        padding: EdgeInsets.symmetric(vertical: 10.h),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // 1. Edit Note
             GestureDetector(
               onTap: () async {
                 Navigator.pop(sheetContext);
-                bool? isUpdated = await Navigator.push(
+                await Navigator.push(
                   context,
                   PageRouteBuilder(
-                    transitionDuration: const Duration(milliseconds: 500),
+                    transitionDuration: const Duration(milliseconds: 280),
                     pageBuilder:
                         (context, animation, secondaryAnimation) => Add(
                           noteId: noteID,
                           existingTitle: title,
                           existingDesc: desc,
                           existingColor: Color(colorValue),
+                          existingReminderAt: reminderAtMs != null
+                              ? DateTime.fromMillisecondsSinceEpoch(reminderAtMs)
+                              : null,
                         ),
                     transitionsBuilder: (
                       context,
@@ -565,9 +661,7 @@ void bottomSheet(
                     },
                   ),
                 );
-                if (isUpdated == true) {
-                  loadnotes();
-                }
+                loadnotes();
               },
               child: ListTile(
                 leading: Icon(Icons.edit, size: 25.sp, color: Colors.white),
@@ -581,6 +675,8 @@ void bottomSheet(
                 ),
               ),
             ),
+
+            // 2. Mark / Remove Important
             GestureDetector(
               onTap: () async {
                 await DbHelper.dbHelper.toggleImportant(noteID, isImportant);
@@ -620,14 +716,76 @@ void bottomSheet(
                 ),
               ),
             ),
+
+            // 3. Remind Me / Remove Reminder
+            GestureDetector(
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                if (reminderAtMs != null) {
+                  // Remove reminder
+                  await DbHelper.dbHelper.updateReminder(noteID, null);
+                  loadnotes();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Reminder removed"),
+                        backgroundColor: Color(0xff1a1a1a),
+                      ),
+                    );
+                  }
+                } else {
+                  // Set reminder
+                  final pickedDate = await pickReminderDateTime(context);
+                  if (pickedDate != null) {
+                    await DbHelper.dbHelper.updateReminder(noteID, pickedDate);
+                    await NotificationService.instance.scheduleNoteReminder(
+                      id: noteID,
+                      title: title,
+                      content: desc,
+                      scheduledDate: pickedDate,
+                    );
+                    loadnotes();
+                    if (context.mounted) {
+                      final formatted =
+                          DateFormat('MMM d, h:mm a').format(pickedDate);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Reminder set for $formatted"),
+                          backgroundColor: const Color(0xff1a1a1a),
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              child: ListTile(
+                leading: Icon(
+                  reminderAtMs != null
+                      ? Icons.alarm_on_rounded
+                      : Icons.alarm_rounded,
+                  size: 25.sp,
+                  color: reminderAtMs != null ? const Color(0xFFFFD54F) : Colors.white,
+                ),
+                title: Text(
+                  reminderAtMs != null ? "Remove Reminder" : "Remind Me",
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    color: Colors.white,
+                    fontFamily: 'NunitoBold',
+                  ),
+                ),
+              ),
+            ),
+
+            // 4. Delete Note
             GestureDetector(
               child: ListTile(
-                leading: Icon(Icons.delete, size: 25.sp, color: Colors.white),
+                leading: Icon(Icons.delete_outline_rounded, size: 25.sp, color: Colors.redAccent),
                 title: Text(
                   "Delete Note",
                   style: TextStyle(
                     fontSize: 20.sp,
-                    color: Colors.white,
+                    color: Colors.redAccent,
                     fontFamily: 'NunitoBold',
                   ),
                 ),
@@ -670,6 +828,26 @@ void bottomSheet(
                   toast();
                 }
               },
+            ),
+
+            // 5. Creation Date & Time Indicator
+            Padding(
+              padding: EdgeInsets.only(top: 8.h, bottom: 4.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.access_time_rounded, size: 14.sp, color: Colors.white38),
+                  SizedBox(width: 6.w),
+                  Text(
+                    formatCreatedAt(createdAtMs),
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      color: Colors.white38,
+                      fontFamily: 'Nunito',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

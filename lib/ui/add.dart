@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:newapp/local/db_helper.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:newapp/local/db_helper.dart';
+import 'package:newapp/services/notification_service.dart';
+import 'package:newapp/ui/notes.dart';
 
 class Add extends StatefulWidget {
   final int? noteId;
   final String? existingTitle;
   final String? existingDesc;
   final Color? existingColor;
+  final DateTime? existingReminderAt;
 
   const Add({
     super.key,
@@ -16,6 +20,7 @@ class Add extends StatefulWidget {
     this.existingTitle,
     this.existingDesc,
     this.existingColor,
+    this.existingReminderAt,
   });
 
   @override
@@ -25,13 +30,14 @@ class Add extends StatefulWidget {
 class _AddState extends State<Add> with WidgetsBindingObserver {
   late final TextEditingController titleController;
   late final TextEditingController descController;
-  Color selectedcolor = Colors.white;
+  late Color selectedcolor;
+  DateTime? _reminderAt;
 
   int? _currentNoteId;
   Timer? _autoSaveTimer;
-  bool _isSaving = false;
+  bool _isPopping = false;
 
-  bool get isEditing => _currentNoteId != null;
+  bool get isEditing => widget.noteId != null;
 
   @override
   void initState() {
@@ -42,6 +48,7 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
     titleController = TextEditingController(text: widget.existingTitle ?? '');
     descController = TextEditingController(text: widget.existingDesc ?? '');
     selectedcolor = widget.existingColor ?? Colors.white;
+    _reminderAt = widget.existingReminderAt;
 
     titleController.addListener(_onContentChanged);
     descController.addListener(_onContentChanged);
@@ -52,24 +59,23 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
-      _flushAutoSave();
+      _autoSaveTimer?.cancel();
+      _saveNote();
     }
   }
 
   void _onContentChanged() {
     _autoSaveTimer?.cancel();
     _autoSaveTimer = Timer(const Duration(milliseconds: 500), () {
-      _performAutoSave();
+      _saveNote();
     });
   }
 
-  Future<void> _performAutoSave() async {
+  Future<bool> _saveNote() async {
     final title = titleController.text.trim();
     final desc = descController.text.trim();
 
-    if (title.isEmpty && desc.isEmpty) return;
-    if (_isSaving) return;
-    _isSaving = true;
+    if (title.isEmpty && desc.isEmpty) return false;
 
     try {
       if (_currentNoteId != null) {
@@ -78,33 +84,148 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
           newTitle: titleController.text,
           newDesc: descController.text,
           newColor: selectedcolor,
+          reminderAt: _reminderAt,
         );
+        if (_reminderAt != null) {
+          try {
+            await NotificationService.instance.scheduleNoteReminder(
+              id: _currentNoteId!,
+              title: titleController.text,
+              content: descController.text,
+              scheduledDate: _reminderAt!,
+            );
+          } catch (_) {}
+        }
       } else {
         int newId = await DbHelper.dbHelper.addNoteReturnId(
           mTitle: titleController.text,
           mDesc: descController.text,
           mColor: selectedcolor,
+          reminderAt: _reminderAt,
         );
         if (newId > 0) {
           _currentNoteId = newId;
+          if (_reminderAt != null) {
+            try {
+              await NotificationService.instance.scheduleNoteReminder(
+                id: newId,
+                title: titleController.text,
+                content: descController.text,
+                scheduledDate: _reminderAt!,
+              );
+            } catch (_) {}
+          }
         }
       }
+      return true;
     } catch (e) {
-      debugPrint("AutoSave error: $e");
-    } finally {
-      _isSaving = false;
+      debugPrint("Save error: $e");
+      return false;
     }
   }
 
-  void _flushAutoSave() {
+  Future<void> _handleBack() async {
+    if (_isPopping) return;
+    _isPopping = true;
     _autoSaveTimer?.cancel();
-    _performAutoSave();
+    await _saveNote();
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  Future<void> _handleReminderAction() async {
+    if (_reminderAt != null) {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25.r)),
+        ),
+        builder: (sheetContext) {
+          return SafeArea(
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 10.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.alarm_off_rounded, color: Colors.redAccent),
+                    title: const Text("Remove Reminder", style: TextStyle(color: Colors.redAccent)),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      if (_currentNoteId != null) {
+                        await DbHelper.dbHelper.updateReminder(_currentNoteId!, null);
+                      }
+                      if (mounted) {
+                        setState(() {
+                          _reminderAt = null;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Reminder removed"),
+                            backgroundColor: Color(0xff1a1a1a),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.edit_calendar_rounded, color: Colors.white),
+                    title: const Text("Change Reminder Time", style: TextStyle(color: Colors.white)),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      final picked = await pickReminderDateTime(context, initialDate: _reminderAt);
+                      if (picked != null) {
+                        if (mounted) {
+                          setState(() {
+                            _reminderAt = picked;
+                          });
+                        }
+                        await _saveNote();
+                        if (mounted) {
+                          final formatted = DateFormat('MMM d, h:mm a').format(picked);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Reminder set for $formatted"),
+                              backgroundColor: const Color(0xff1a1a1a),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      final picked = await pickReminderDateTime(context);
+      if (picked != null) {
+        if (mounted) {
+          setState(() {
+            _reminderAt = picked;
+          });
+        }
+        await _saveNote();
+        if (mounted) {
+          final formatted = DateFormat('MMM d, h:mm a').format(picked);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Reminder set for $formatted"),
+              backgroundColor: const Color(0xff1a1a1a),
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _flushAutoSave();
     _autoSaveTimer?.cancel();
     titleController.removeListener(_onContentChanged);
     descController.removeListener(_onContentChanged);
@@ -169,9 +290,10 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
-        _flushAutoSave();
+      canPop: _isPopping,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBack();
       },
       child: Scaffold(
         backgroundColor: selectedcolor,
@@ -184,14 +306,25 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
               children: [
                 SizedBox(height: 20.h),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      onPressed: () {
-                        _flushAutoSave();
-                        Navigator.pop(context, true);
-                      },
+                      onPressed: _handleBack,
                       icon: const Icon(Icons.arrow_back),
                       iconSize: 35.sp,
+                      color: Colors.black,
+                    ),
+                    IconButton(
+                      onPressed: _handleReminderAction,
+                      icon: Icon(
+                        _reminderAt != null
+                            ? Icons.alarm_on_rounded
+                            : Icons.alarm_rounded,
+                        size: 32.sp,
+                        color: _reminderAt != null
+                            ? const Color(0xFFD48806)
+                            : Colors.black,
+                      ),
                     ),
                   ],
                 ),
@@ -263,26 +396,10 @@ class _AddState extends State<Add> with WidgetsBindingObserver {
                 GestureDetector(
                   child: _BottomButton(icon: Icons.save, color: selectedcolor),
                   onTap: () async {
-                    _autoSaveTimer?.cancel();
-                    if (isEditing) {
-                      await DbHelper.dbHelper.updateNote(
-                        id: _currentNoteId!,
-                        newTitle: titleController.text,
-                        newDesc: descController.text,
-                        newColor: selectedcolor,
-                      );
-                    } else {
-                      await DbHelper.dbHelper.addnote(
-                        mTilte: titleController.text,
-                        mDesc: descController.text,
-                        mColor: selectedcolor,
-                      );
-                    }
-                    if (context.mounted) {
-                      Navigator.pop(context, true);
-                    }
+                    bool wasEditing = isEditing;
+                    await _handleBack();
                     Fluttertoast.showToast(
-                      msg: isEditing ? "Updated Successfully" : "Added Successfully",
+                      msg: wasEditing ? "Updated Successfully" : "Added Successfully",
                       toastLength: Toast.LENGTH_SHORT,
                       gravity: ToastGravity.BOTTOM,
                       fontSize: 20.sp,

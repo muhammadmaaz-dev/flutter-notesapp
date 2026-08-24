@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:newapp/services/notification_service.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -14,6 +15,8 @@ class DbHelper {
   static const String COL_NOTE_DESC = "desc";
   static const String COL_NOTE_COLOR = "color";
   static const String COL_NOTE_IMPORTANT = "important";
+  static const String COL_NOTE_REMINDER_AT = "reminder_at";
+  static const String COL_NOTE_CREATED_AT = "created_at";
 
   Database? myDB;
 
@@ -28,22 +31,43 @@ class DbHelper {
 
     return await openDatabase(
       dbPath,
-      version: 3,
+      version: 5,
       onCreate: (db, version) {
         db.execute(
-          "CREATE TABLE $TABLE_NOTE($COL_NOTE_SNO INTEGER PRIMARY KEY AUTOINCREMENT, $COL_NOTE_TITLE TEXT, $COL_NOTE_DESC TEXT, $COL_NOTE_COLOR INTEGER, $COL_NOTE_IMPORTANT INTEGER DEFAULT 0)",
+          "CREATE TABLE $TABLE_NOTE($COL_NOTE_SNO INTEGER PRIMARY KEY AUTOINCREMENT, $COL_NOTE_TITLE TEXT, $COL_NOTE_DESC TEXT, $COL_NOTE_COLOR INTEGER, $COL_NOTE_IMPORTANT INTEGER DEFAULT 0, $COL_NOTE_REMINDER_AT INTEGER, $COL_NOTE_CREATED_AT INTEGER)",
         );
       },
       onUpgrade: (db, oldVersion, newVersion) {
         if (oldVersion < 2) {
-          db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_IMPORTANT INTEGER DEFAULT 0;");
+          try {
+            db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_IMPORTANT INTEGER DEFAULT 0;");
+          } catch (_) {}
         }
+        if (oldVersion < 4) {
+          try {
+            db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_REMINDER_AT INTEGER;");
+          } catch (_) {}
+        }
+        if (oldVersion < 5) {
+          try {
+            db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_CREATED_AT INTEGER;");
+          } catch (_) {}
+        }
+      },
+      onOpen: (db) async {
+        try {
+          await db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_REMINDER_AT INTEGER;");
+        } catch (_) {}
+        try {
+          await db.execute("ALTER TABLE $TABLE_NOTE ADD COLUMN $COL_NOTE_CREATED_AT INTEGER;");
+        } catch (_) {}
       },
     );
   }
 
   Future<int> deleteNote(int id) async {
     var db = await getDB();
+    await NotificationService.instance.cancelReminder(id);
     return await db.delete(
       TABLE_NOTE,
       where: "$COL_NOTE_SNO = ?",
@@ -81,10 +105,27 @@ class DbHelper {
     );
   }
 
+  Future<int> updateReminder(int noteId, DateTime? reminderAt) async {
+    var db = await getDB();
+    if (reminderAt == null) {
+      await NotificationService.instance.cancelReminder(noteId);
+    }
+    return await db.update(
+      TABLE_NOTE,
+      {
+        COL_NOTE_REMINDER_AT: reminderAt?.millisecondsSinceEpoch,
+      },
+      where: "$COL_NOTE_SNO = ?",
+      whereArgs: [noteId],
+    );
+  }
+
   Future<bool> addnote({
     required String mTilte,
     required String mDesc,
     required Color mColor,
+    DateTime? reminderAt,
+    DateTime? createdAt,
   }) async {
     var db = await getDB();
     int rowseffected = await db.insert(TABLE_NOTE, {
@@ -92,6 +133,8 @@ class DbHelper {
       COL_NOTE_DESC: mDesc,
       COL_NOTE_COLOR: mColor.toARGB32(),
       COL_NOTE_IMPORTANT: 0,
+      COL_NOTE_REMINDER_AT: reminderAt?.millisecondsSinceEpoch,
+      COL_NOTE_CREATED_AT: (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
     });
     return rowseffected > 0;
   }
@@ -100,6 +143,8 @@ class DbHelper {
     required String mTitle,
     required String mDesc,
     required Color mColor,
+    DateTime? reminderAt,
+    DateTime? createdAt,
   }) async {
     var db = await getDB();
     return await db.insert(TABLE_NOTE, {
@@ -107,6 +152,8 @@ class DbHelper {
       COL_NOTE_DESC: mDesc,
       COL_NOTE_COLOR: mColor.toARGB32(),
       COL_NOTE_IMPORTANT: 0,
+      COL_NOTE_REMINDER_AT: reminderAt?.millisecondsSinceEpoch,
+      COL_NOTE_CREATED_AT: (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
     });
   }
 
@@ -123,15 +170,20 @@ class DbHelper {
     required String newTitle,
     required String newDesc,
     required Color newColor,
+    DateTime? reminderAt,
   }) async {
     var db = await getDB();
+    Map<String, dynamic> values = {
+      COL_NOTE_TITLE: newTitle,
+      COL_NOTE_DESC: newDesc,
+      COL_NOTE_COLOR: newColor.toARGB32(),
+    };
+    if (reminderAt != null) {
+      values[COL_NOTE_REMINDER_AT] = reminderAt.millisecondsSinceEpoch;
+    }
     return await db.update(
       TABLE_NOTE,
-      {
-        COL_NOTE_TITLE: newTitle,
-        COL_NOTE_DESC: newDesc,
-        COL_NOTE_COLOR: newColor.toARGB32(),
-      },
+      values,
       where: "$COL_NOTE_SNO = ?",
       whereArgs: [id],
     );
