@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:newapp/ui/notes.dart';
 import 'package:newapp/ui/add.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class readnotes extends StatelessWidget {
+  final int? noteId;
   final String title;
   final String desc;
   final Color color;
 
-  readnotes({
+  const readnotes({
     super.key,
+    this.noteId,
     required this.title,
     required this.desc,
     required this.color,
@@ -19,8 +20,7 @@ class readnotes extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: color,
-      resizeToAvoidBottomInset: true, // body keyboard ke saath resize ho
-      // ---- BODY ----
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 15.r),
@@ -28,8 +28,6 @@ class readnotes extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -40,18 +38,37 @@ class readnotes extends StatelessWidget {
                     icon: const Icon(Icons.arrow_back),
                     iconSize: 35.sp,
                   ),
-
                   IconButton(
-                    onPressed: () {},
-                    icon: Icon(Icons.edit),
+                    onPressed: () async {
+                      bool? isUpdated = await Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          transitionDuration: const Duration(milliseconds: 500),
+                          pageBuilder: (context, animation, secondaryAnimation) => Add(
+                            noteId: noteId,
+                            existingTitle: title,
+                            existingDesc: desc,
+                            existingColor: color,
+                          ),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            const begin = Offset(0.0, 1.0);
+                            const end = Offset.zero;
+                            const curve = Curves.ease;
+                            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                            return SlideTransition(position: animation.drive(tween), child: child);
+                          },
+                        ),
+                      );
+                      if (isUpdated == true && context.mounted) {
+                        Navigator.pop(context, true);
+                      }
+                    },
+                    icon: const Icon(Icons.edit),
                     iconSize: 35.sp,
                   ),
                 ],
               ),
-
               SizedBox(height: 20.h),
-
-              // Title
               Text(
                 title,
                 style: TextStyle(
@@ -61,10 +78,7 @@ class readnotes extends StatelessWidget {
                   fontFamily: 'NunitoBold',
                 ),
               ),
-
               SizedBox(height: 15.h),
-
-              // Description
               Text(
                 desc,
                 style: TextStyle(
@@ -74,8 +88,7 @@ class readnotes extends StatelessWidget {
                   fontFamily: 'Nunito',
                 ),
               ),
-
-              SizedBox(height: 100.h), // content ke end me thodi space
+              SizedBox(height: 100.h),
             ],
           ),
         ),

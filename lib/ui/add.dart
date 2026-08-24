@@ -1,21 +1,119 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:newapp/local/db_helper.dart';
-import 'package:newapp/ui/notes.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class Add extends StatefulWidget {
-  const Add({super.key});
+  final int? noteId;
+  final String? existingTitle;
+  final String? existingDesc;
+  final Color? existingColor;
+
+  const Add({
+    super.key,
+    this.noteId,
+    this.existingTitle,
+    this.existingDesc,
+    this.existingColor,
+  });
 
   @override
   State<Add> createState() => _AddState();
 }
 
-class _AddState extends State<Add> {
-  @override
-  final titleController = TextEditingController();
-  final descController = TextEditingController();
+class _AddState extends State<Add> with WidgetsBindingObserver {
+  late final TextEditingController titleController;
+  late final TextEditingController descController;
   Color selectedcolor = Colors.white;
+
+  int? _currentNoteId;
+  Timer? _autoSaveTimer;
+  bool _isSaving = false;
+
+  bool get isEditing => _currentNoteId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _currentNoteId = widget.noteId;
+    titleController = TextEditingController(text: widget.existingTitle ?? '');
+    descController = TextEditingController(text: widget.existingDesc ?? '');
+    selectedcolor = widget.existingColor ?? Colors.white;
+
+    titleController.addListener(_onContentChanged);
+    descController.addListener(_onContentChanged);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _flushAutoSave();
+    }
+  }
+
+  void _onContentChanged() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(milliseconds: 500), () {
+      _performAutoSave();
+    });
+  }
+
+  Future<void> _performAutoSave() async {
+    final title = titleController.text.trim();
+    final desc = descController.text.trim();
+
+    if (title.isEmpty && desc.isEmpty) return;
+    if (_isSaving) return;
+    _isSaving = true;
+
+    try {
+      if (_currentNoteId != null) {
+        await DbHelper.dbHelper.updateNote(
+          id: _currentNoteId!,
+          newTitle: titleController.text,
+          newDesc: descController.text,
+          newColor: selectedcolor,
+        );
+      } else {
+        int newId = await DbHelper.dbHelper.addNoteReturnId(
+          mTitle: titleController.text,
+          mDesc: descController.text,
+          mColor: selectedcolor,
+        );
+        if (newId > 0) {
+          _currentNoteId = newId;
+        }
+      }
+    } catch (e) {
+      debugPrint("AutoSave error: $e");
+    } finally {
+      _isSaving = false;
+    }
+  }
+
+  void _flushAutoSave() {
+    _autoSaveTimer?.cancel();
+    _performAutoSave();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _flushAutoSave();
+    _autoSaveTimer?.cancel();
+    titleController.removeListener(_onContentChanged);
+    descController.removeListener(_onContentChanged);
+    titleController.dispose();
+    descController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final List<Color> bgColor = [
       Color(0xfffca590),
@@ -32,7 +130,7 @@ class _AddState extends State<Add> {
       Color.fromARGB(255, 112, 199, 105),
     ];
 
-    void _callbottomsheet() {
+    void callBottomSheet() {
       showModalBottomSheet(
         context: context,
         shape: RoundedRectangleBorder(
@@ -50,6 +148,8 @@ class _AddState extends State<Add> {
                     setState(() {
                       selectedcolor = color;
                     });
+                    _onContentChanged();
+                    Navigator.pop(context);
                   },
                   child: CircleAvatar(
                     backgroundColor: color,
@@ -66,131 +166,133 @@ class _AddState extends State<Add> {
       );
     }
 
-    final bottomInset = MediaQuery.of(
-      context,
-    ).viewInsets.bottom; // keyboard height
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Scaffold(
-      backgroundColor: selectedcolor,
-      resizeToAvoidBottomInset: true, // body keyboard ke saath resize ho
-      // ---- BODY ----
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 15.r),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 20.h),
-
-              // Back button row
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.pop(
-                        context,
-                        false,
-                        //MaterialPageRoute(builder: (context) => NotesUi()),
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_back),
-                    iconSize: 35.sp,
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 20.h),
-
-              // Title
-              TextField(
-                controller: titleController,
-                keyboardType: TextInputType.multiline,
-                maxLines: 2,
-                style: TextStyle(
-                  fontSize: 40.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                  fontFamily: 'NunitoBold',
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        _flushAutoSave();
+      },
+      child: Scaffold(
+        backgroundColor: selectedcolor,
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 15.r),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 20.h),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        _flushAutoSave();
+                        Navigator.pop(context, true);
+                      },
+                      icon: const Icon(Icons.arrow_back),
+                      iconSize: 35.sp,
+                    ),
+                  ],
                 ),
-                decoration: InputDecoration(
-                  hintText: "Title",
-                  hintStyle: TextStyle(
-                    color: const Color.fromARGB(255, 31, 30, 30),
+                SizedBox(height: 20.h),
+                TextField(
+                  controller: titleController,
+                  keyboardType: TextInputType.multiline,
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontSize: 40.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                     fontFamily: 'NunitoBold',
                   ),
-                  border: InputBorder.none,
-                ),
-              ),
-              SizedBox(height: 15.h),
-              // Description
-              TextField(
-                controller: descController,
-                keyboardType: TextInputType.multiline,
-                maxLines: null, // taake scroll ho sake, overflow na ho
-                style: TextStyle(
-                  fontSize: 25.sp,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Nunito',
-                ),
-                decoration: InputDecoration(
-                  hintText: "Description",
-                  hintStyle: TextStyle(
-                    color: const Color.fromARGB(255, 31, 30, 30),
-                    fontFamily: 'NunitoBold',
+                  decoration: InputDecoration(
+                    hintText: "Title",
+                    hintStyle: TextStyle(
+                      color: const Color.fromARGB(255, 31, 30, 30),
+                      fontFamily: 'NunitoBold',
+                    ),
+                    border: InputBorder.none,
                   ),
-                  border: InputBorder.none,
                 ),
-              ),
-
-              SizedBox(height: 100.h), // content ke end me thodi space
-            ],
+                SizedBox(height: 15.h),
+                TextField(
+                  controller: descController,
+                  keyboardType: TextInputType.multiline,
+                  maxLines: null,
+                  style: TextStyle(
+                    fontSize: 25.sp,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Nunito',
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "Description",
+                    hintStyle: TextStyle(
+                      color: const Color.fromARGB(255, 31, 30, 30),
+                      fontFamily: 'NunitoBold',
+                    ),
+                    border: InputBorder.none,
+                  ),
+                ),
+                SizedBox(height: 100.h),
+              ],
+            ),
           ),
         ),
-      ),
-
-      // ---- BOTTOM BAR (keyboard ke upar chipak jayega) ----
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(40, 10, 40, bottomInset + 20),
-        child: Container(
-          height: 85.h,
-
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(40.r),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  _callbottomsheet();
-                },
-                child: _BottomButton(
-                  icon: Icons.color_lens_rounded,
-                  color: selectedcolor,
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.fromLTRB(40, 10, 40, bottomInset + 20),
+          child: Container(
+            height: 85.h,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(40.r),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    callBottomSheet();
+                  },
+                  child: _BottomButton(
+                    icon: Icons.color_lens_rounded,
+                    color: selectedcolor,
+                  ),
                 ),
-              ),
-              GestureDetector(
-                child: _BottomButton(icon: Icons.save, color: selectedcolor),
-                onTap: () async {
-                  await DbHelper.dbHelper.addnote(
-                    mTilte: titleController.text,
-                    mDesc: descController.text,
-                    mColor: selectedcolor,
-                  );
-                  Navigator.pop(context, true);
-                  Fluttertoast.showToast(
-                    msg: "Added Sucessfully",
-                    toastLength: Toast.LENGTH_SHORT,
-                    gravity: ToastGravity.BOTTOM,
-                    fontSize: 20.sp,
-                    textColor: Colors.black,
-                    backgroundColor: Colors.green,
-                  );
-                },
-              ),
-            ],
+                GestureDetector(
+                  child: _BottomButton(icon: Icons.save, color: selectedcolor),
+                  onTap: () async {
+                    _autoSaveTimer?.cancel();
+                    if (isEditing) {
+                      await DbHelper.dbHelper.updateNote(
+                        id: _currentNoteId!,
+                        newTitle: titleController.text,
+                        newDesc: descController.text,
+                        newColor: selectedcolor,
+                      );
+                    } else {
+                      await DbHelper.dbHelper.addnote(
+                        mTilte: titleController.text,
+                        mDesc: descController.text,
+                        mColor: selectedcolor,
+                      );
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(context, true);
+                    }
+                    Fluttertoast.showToast(
+                      msg: isEditing ? "Updated Successfully" : "Added Successfully",
+                      toastLength: Toast.LENGTH_SHORT,
+                      gravity: ToastGravity.BOTTOM,
+                      fontSize: 20.sp,
+                      textColor: Colors.black,
+                      backgroundColor: Colors.green,
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
