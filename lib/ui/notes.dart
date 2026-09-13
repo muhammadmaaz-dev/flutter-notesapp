@@ -177,6 +177,7 @@ class _NotesUiState extends State<NotesUi> {
               ),
             ),
 
+
             // 2. Sticky Filter Pills Bar (pinned: true)
             SliverPersistentHeader(
               pinned: true,
@@ -391,7 +392,7 @@ class _NotesUiState extends State<NotesUi> {
                       child: Image.asset(
                         'assets/1b1ebb0d0b3b5d8b-capybara-7.png',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
+                        errorBuilder: (_, _, _) => const Icon(
                           Icons.sticky_note_2_rounded,
                           color: Colors.white,
                         ),

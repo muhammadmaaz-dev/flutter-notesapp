@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:newapp/services/appwrite_service.dart';
 import 'package:newapp/services/supabase_analytics_service.dart';
 import 'package:newapp/ui/notes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,11 +42,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _handleGetStarted() async {
     HapticFeedback.lightImpact();
     
-    // Asynchronously register anonymous user in Supabase (Non-blocking)
-    SupabaseAnalyticsService.instance.registerUser();
-
+    // 1. Mark onboarded locally immediately so UI transition is instantaneous
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_onboarded', true);
+
+    // 2. Silently trigger Appwrite user onboarding in the background (Zero UI blocking)
+    unawaited(AppwriteService.instance.logUserOnboarding());
+
+    // 3. Register user in Supabase (Non-blocking)
+    SupabaseAnalyticsService.instance.registerUser();
 
     if (!mounted) return;
 
